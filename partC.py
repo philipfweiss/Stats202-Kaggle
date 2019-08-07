@@ -27,7 +27,7 @@ Output: Trained model.
 def train_model(dataset):
     data, labels, _ = dataset
     n, d = data.shape
-    return XGBRegressor(gamma=0.1, max_depth=100, objective='reg:squarederror').fit(data, labels)
+    return XGBRegressor(gamma=51, max_depth=5, objective='reg:squarederror').fit(data, labels)
 
 
 # def get_fake_data():
@@ -39,6 +39,7 @@ def train_model(dataset):
 #     return x, y
 
 
+
 def part_c():
 
     e_pids = None
@@ -48,7 +49,7 @@ def part_c():
 
 
     all_data = load_data_c(['Study_A.csv', 'Study_B.csv', 'Study_C.csv', 'Study_D.csv']) ## TODO: Change back to actual data loading.
-    test = load_data_c(['Study_E.csv'], e_pids=e_pids)
+    test = load_data_c(['Study_E.csv'])#, e_pids=e_pids)
     model = train_model(all_data)
     acc = test_accuracy_regression(model, test)
 
