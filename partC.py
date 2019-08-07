@@ -6,7 +6,7 @@ from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 from scipy import sparse
 from xgboost import XGBRegressor
-
+from sklearn import linear_model
 import csv
 from preprocess import *
 from evaluation import *
@@ -25,9 +25,9 @@ which has already been pre-processed and is ready to train on.
 Output: Trained model.
 """
 def train_model(dataset):
-    data, labels = dataset
+    data, labels, _ = dataset
     n, d = data.shape
-    return XGBRegressor(early_stopping_rounds=5, gamma=0.1, max_depth=100, eval_metric="rmse").fit(data, labels)
+    return XGBRegressor(gamma=0.1, max_depth=100, objective='reg:squarederror').fit(data, labels)
 
 
 # def get_fake_data():
@@ -40,14 +40,17 @@ def train_model(dataset):
 
 
 def part_c():
-    all_data = load_data(['Study_A.csv', 'Study_B.csv', 'Study_C.csv', 'Study_D.csv']) ## TODO: Change back to actual data loading.
-    test = load_data(['Study_E.csv'], is_e=True)
-    print(all_data[0].shape)
-    print(test[0].shape)
-    # train, val, test = train_val_test(all_data)
+
+    e_pids = None
+    with open('sample_submission_PANSS.csv') as cv:
+        vals = [row.split(',') for row in cv]
+        e_pids = [val[0] for idx, val in enumerate(vals) if idx != 0]
+
+
+    all_data = load_data_c(['Study_A.csv', 'Study_B.csv', 'Study_C.csv', 'Study_D.csv']) ## TODO: Change back to actual data loading.
+    test = load_data_c(['Study_E.csv'], e_pids=e_pids)
     model = train_model(all_data)
-    # test_accuracy_regression(model, all_data)
-    test_accuracy_regression(model, test)
+    acc = test_accuracy_regression(model, test)
 
 
 
