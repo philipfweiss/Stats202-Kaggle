@@ -26,20 +26,17 @@ Input: (n x d) matrix representing data in the training set,
 which has already been pre-processed and is ready to train on.
 Output: Trained model.
 """
-def train_model(dataset):
+def train_model(dataset, gamma, depth):
     data, labels, _ = dataset
     n, d = data.shape
-    return XGBRegressor(gamma=51, max_depth=5, objective='reg:squarederror').fit(data, labels)
+    return XGBRegressor(gamma=gamma, max_depth=depth, objective='reg:squarederror').fit(data, labels)
 
+    # return XGBRegressor(gamma=47.71, max_depth=5, objective='reg:squarederror').fit(data, labels)
 
-# def get_fake_data():
-#     x = np.random.normal(0, 1, (20000, 1))
-#     e = np.random.normal(0, .1, (20000, 1))
-#     y = x + e
-#     plt.scatter(x, y)
-#     plt.show()
-#     return x, y
-
+def train_model_d(dataset):
+    data, labels, _ = dataset
+    n, d = data.shape
+    return XGBRegressor(gamma=gamma, max_depth=depth, objective='binary:logistic').fit(data, labels)
 
 
 def part_c():
@@ -50,20 +47,35 @@ def part_c():
         e_pids = [val[0] for idx, val in enumerate(vals) if idx != 0]
 
 
-    all_data = load_data_c(['Study_A.csv', 'Study_B.csv', 'Study_C.csv', 'Study_D.csv']) ## TODO: Change back to actual data loading.
-    test = load_data_c(['Study_E.csv'])#, e_pids=e_pids)
-    model = train_model(all_data)
+    all_data = load_data_c(['Study_A.csv', 'Study_B.csv', 'Study_C.csv', 'Study_D.csv', 'Study_E.csv']) ## TODO: Change back to actual data loading.
+    train, val, _ = train_val_test(all_data)
+    test = load_data_c(['Study_E.csv'], e_pids=e_pids)
+    model = train_model(all_data, 42.71, 5)
     acc = test_accuracy_regression(model, test)
+    print(acc)
+    #
+    # loss = []
+    # for gamma in np.linspace(32, 62, 15):
+    #     model = train_model(train, gamma, 5)
+    #     acc = test_accuracy_regression(model, val)
+    #     print(acc, gamma, 5)
+    #     loss.append((acc, gamma, 5))
+    # print(sorted(loss))
 
 
 
 def part_d():
-    pass
+    all_data = load_data_d(['Study_A.csv', 'Study_B.csv', 'Study_C.csv', 'Study_D.csv']) ## TODO: Change back to actual data loading.
+    train, val, _ = train_val_test(all_data)
+    # test = load_data_c(['Study_E.csv'], e_pids=e_pids)
+    model = train_model(all_data)
+    # acc = test_accuracy_regression(model, test)
+    # print(acc)
 
 
 def __main__():
-    part_c()
-    # part_d()
+    # part_c()
+    part_d()
 
 
 __main__()
