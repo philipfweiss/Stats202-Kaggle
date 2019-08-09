@@ -6,6 +6,8 @@ from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 from scipy import sparse
 from xgboost import XGBRegressor
+from xgboost import XGBClassifier
+
 from sklearn import linear_model
 import csv
 from preprocess import *
@@ -33,10 +35,12 @@ def train_model(dataset, gamma, depth):
 
     # return XGBRegressor(gamma=47.71, max_depth=5, objective='reg:squarederror').fit(data, labels)
 
-def train_model_d(dataset):
+def train_model_d(dataset, gamma, depth):
     data, labels, _ = dataset
     n, d = data.shape
-    return XGBRegressor(gamma=gamma, max_depth=depth, objective='binary:logistic').fit(data, labels)
+    return XGBClassifier(gamma=gamma, max_depth=depth, objective='binary:logistic').fit(data, labels)
+
+    # return XGBClassifier(gamma=47.71, max_depth=5, objective='binary:logistic').fit(data, labels)
 
 
 def part_c():
@@ -47,10 +51,10 @@ def part_c():
         e_pids = [val[0] for idx, val in enumerate(vals) if idx != 0]
 
 
-    all_data = load_data_c(['Study_A.csv', 'Study_B.csv', 'Study_C.csv', 'Study_D.csv', 'Study_E.csv']) ## TODO: Change back to actual data loading.
-    train, val, _ = train_val_test(all_data)
-    test = load_data_c(['Study_E.csv'], e_pids=e_pids)
-    model = train_model(all_data, 42.71, 5)
+    all_data = load_data_c(['Study_A.csv', 'Study_B.csv', 'Study_C.csv', 'Study_D.csv']) ## TODO: Change back to actual data loading.
+    # train, val, _ = train_val_test(all_data)
+    test = load_data_c(['Study_E.csv'])#, e_pids=e_pids)
+    model = train_model(all_data, 42.71, 6)
     acc = test_accuracy_regression(model, test)
     print(acc)
     #
@@ -66,16 +70,27 @@ def part_c():
 
 def part_d():
     all_data = load_data_d(['Study_A.csv', 'Study_B.csv', 'Study_C.csv', 'Study_D.csv']) ## TODO: Change back to actual data loading.
+    # print(all_data[2])
     train, val, _ = train_val_test(all_data)
-    # test = load_data_c(['Study_E.csv'], e_pids=e_pids)
-    model = train_model(all_data)
-    # acc = test_accuracy_regression(model, test)
-    # print(acc)
+
+    test = load_data_d(['Study_E.csv'])#, e_pids=e_pids)
+    loss = []
+    # for gamma in np.linspace(52, 60, 15):
+    #     for depth in [5, 6, 7, 8]:
+    #         model = train_model_d(all_data, gamma, depth)
+    #         acc = test_accuracy_binary_classification(model, test)
+    #         print(acc, gamma, depth)
+    #         loss.append((acc, gamma, depth))
+    # print(sorted(loss))
+
+    model = train_model_d(all_data, gamma=54.285714285714285, depth=5)
+    acc = test_accuracy_binary_classification(model, test)
+    print(acc)
 
 
 def __main__():
-    # part_c()
-    part_d()
+    part_c()
+    # part_d()
 
 
 __main__()

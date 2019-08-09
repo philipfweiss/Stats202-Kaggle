@@ -18,10 +18,14 @@ in the dataset.
 ##  - Num previous observations
 ##  - TxGroup
 
-NUM_PREDICTORS = 17
+NUM_PREDICTORS = 21
 TEST_DAY = 120
-countries = set(['"USA"', '"UK"', '"Russia"', '"India"', '"Spain"', '"Country"', '"Ukraine"', '"Czech Republic"', '"Romania"'] + ['"Russia"', '"Mexico"', '"Sweden"', '"Ukraine"', '"Korea"', '"Czech Republic"', '"Poland"', '"Bulgaria"', '"Greece"', '"Country"', '"Argentina"', '"Canada"', '"Japan"', '"Belgium"', '"Taiwan"', '"USA"', '"Spain"', '"China"', '"Australia"', '"Romania"', '"ERROR"', '"Brazil"', '"Slovakia"', '"Hungary"', '"Germany"', '"France"', '"Portugal"', '"Austria"'])
-countryMap = {v: idx for idx, v in enumerate(countries)}
+countries = {
+    '"UK"': 1,
+    '"USA"': 2,
+    '"Russia"': 3,
+}
+
 studies = {'"A"', '"B"', '"C"', '"D"', '"E"'}
 
 class Observation:
@@ -33,7 +37,7 @@ class Observation:
 
 class CPatient:
     def __init__(self, id, tx, ctr, stdy):
-        self.ctr = countryMap[ctr]
+        self.ctr = countries[ctr] if ctr in countries else 0
         self.study = stdy
         self.id = id
         self.tx = 0 if tx == '"Control"' else 1
@@ -44,12 +48,14 @@ class CPatient:
         self.observations.append(obs)
 
     def res(self, cur, first, second, third, fourth, fifth, day):
-
+        ctr = [0, 0, 0, 0]
+        ctr[self.ctr] = 1
+        # print(*ctr)
         fm = np.array([
             self.tx,
             day,
             *[1 if self.study == study else 0 for study in studies],
-            # *[1 if self.ctr == idx else 0 for idx in range(len(countries))],
+            *ctr,
             fifth.day, fourth.day, third.day, second.day, first.day,
             first.p + first.n + first.g,
             second.p + second.n + second.g,
@@ -97,8 +103,6 @@ def load_data_c(filenames, e_pids=None):
             ## Add some counting data structures.
             vals = [row.split(',') for row in cv]
             nrows = len(vals)
-            countries = {data[1] for data in vals}
-            countryMap = {country: idx for idx, country in enumerate(countries)}
             patients = {(data[2], data[6], data[1], data[0]) for idx, data in enumerate(vals) if idx != 0}
             patientMap = {id: CPatient(id, tx, ctr, stdy) for idx, (id, tx, ctr, stdy) in enumerate(patients)}
             patientCounter = collections.defaultdict(int)
@@ -155,14 +159,17 @@ input: (nxd) matrix of training data, (n,1) matrix of labels
 returns: training, validation, testing set
 """
 def train_val_test(dataset, train=.9, val=.1, test=.0):
-    data, labels, _ = dataset
+    data, labels, ids = dataset
     n, d = data.shape
+    is_numpy = type(ids).__module__ == np.__name__
+    if not is_numpy:
+        ids = np.zeros((n,))
     p = np.random.permutation(n)
-    data, labels = data[p], labels[p]
+    data, labels, ids = data[p], labels[p], ids[p]
 
     num_train, num_val, num_test = int(n * train), int(n * val), int(n * test)
 
-    train = (data[0:num_train, :], labels[0:num_train], 1)
-    val = (data[num_train:num_train+num_val, :], labels[num_train:num_train+num_val], 1)
-    test = (data[num_train+num_val:, :], labels[num_train+num_val:], 1)
+    train = (data[0:num_train, :], labels[0:num_train], ids[0:num_train],)
+    val = (data[num_train:num_train+num_val, :], labels[num_train:num_train+num_val], ids[num_train:num_train+num_val])
+    test = (data[num_train+num_val:, :], labels[num_train+num_val:], ids[num_train+num_val:])
     return train, val, test

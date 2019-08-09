@@ -19,9 +19,13 @@ in the dataset.
 ##  - Num previous observations
 ##  - TxGroup
 
-NUM_PREDICTORS = 17
-countries = set(['"USA"', '"UK"', '"Russia"', '"India"', '"Spain"', '"Country"', '"Ukraine"', '"Czech Republic"', '"Romania"'] + ['"Russia"', '"Mexico"', '"Sweden"', '"Ukraine"', '"Korea"', '"Czech Republic"', '"Poland"', '"Bulgaria"', '"Greece"', '"Country"', '"Argentina"', '"Canada"', '"Japan"', '"Belgium"', '"Taiwan"', '"USA"', '"Spain"', '"China"', '"Australia"', '"Romania"', '"ERROR"', '"Brazil"', '"Slovakia"', '"Hungary"', '"Germany"', '"France"', '"Portugal"', '"Austria"'])
-countryMap = {v: idx for idx, v in enumerate(countries)}
+NUM_PREDICTORS = 25
+countries = {
+    '"USA"':1,
+    '"UK"':2,
+    '"Russia"':3,
+}
+
 studies = {'"A"', '"B"', '"C"', '"D"', '"E"'}
 
 class Observation:
@@ -34,7 +38,7 @@ class Observation:
 
 class DPatient:
     def __init__(self, id, tx, ctr, stdy):
-        self.ctr = countryMap[ctr]
+        self.ctr = countries[ctr] if ctr in countries else 0
         self.study = stdy
         self.id = id
         self.tx = 0 if tx == '"Control"' else 1
@@ -45,23 +49,40 @@ class DPatient:
         self.observations.append(obs)
 
     def res(self, cur, first, second, third, fourth, fifth):
+        num_diff =  len(self.observations) - 1
+        if num_diff > 0:
+            avg_p_diff = sum(
+                [self.observations[idx+1].p - self.observations[idx].p for idx, _ in enumerate(self.observations) if idx < num_diff]
+            )
+            avg_n_diff = sum(
+                [self.observations[idx+1].n - self.observations[idx].n for idx, _ in enumerate(self.observations) if idx < num_diff]
+            )
+            avg_g_diff = sum(
+                [self.observations[idx+1].g - self.observations[idx].g for idx, _ in enumerate(self.observations) if idx < num_diff]
+            )
+        else:
+            avg_p_diff, avg_n_diff, avg_g_diff = 0, 0, 0
+        # print(*[1 if self.ctr == idx else 0 for idx in range(len(countryMap.values()))])
 
+        ctrys = [0, 0, 0, 0]
+        ctrys[self.ctr] = 1
         fm = np.array([
             self.tx,
             cur.day,
+            avg_p_diff, avg_n_diff, avg_g_diff,
             *[1 if self.study == study else 0 for study in studies],
-            *[1 if self.ctr == idx else 0 for idx in range(len(countries))],
+            *ctrys,
             fifth.day, fourth.day, third.day, second.day, first.day,
-            cur.p, cur.n, cur.g,
-            first.p, first.n, first.g,
-            second.p, second.n, second.g,
-            third.p, third.n, third.g,
-            fourth.p, fourth.n, fourth.g,
-            fifth.p, fifth.n, fifth.g,
+            cur.p + cur.n +cur.g,
+            first.p + first.n + first.g,
+            second.p + second.n + second.g,
+            third.p + third.n + third.g,
+            fourth.p + fourth.n + fourth.g,
+            fifth.p + fifth.n + fifth.g,
         ])
 
         label = cur.label
-        return fm, label, cur.pid
+        return fm, label, cur.observation_no
 
     def getFeatureMaps(self, is_e=False):
         for i, obs in enumerate(self.observations):
@@ -77,11 +98,12 @@ class DPatient:
 options = {
     "Flagged": 1,
     "Passed": 0,
-    "Assign to CS": 1
+    "AssigntoCS": 1
 }
 def load_data_d(filenames, e_pids=None):
     data = []
     all_labels = []
+    all_pids = []
     pidmap = collections.defaultdict(list)
 
     for filename in filenames:
@@ -90,8 +112,6 @@ def load_data_d(filenames, e_pids=None):
             ## Add some counting data structures.
             vals = [row.split(',') for row in cv]
             nrows = len(vals)
-            countries = {data[1] for data in vals}
-            countryMap = {country: idx for idx, country in enumerate(countries)}
             patients = {(data[2], data[6], data[1], data[0]) for idx, data in enumerate(vals) if idx != 0}
             patientMap = {id: DPatient(id, tx, ctr, stdy) for idx, (id, tx, ctr, stdy) in enumerate(patients)}
             patientCounter = collections.defaultdict(int)
@@ -103,7 +123,7 @@ def load_data_d(filenames, e_pids=None):
                 day, patient_no = int(row[7]), row[2]
                 patientCounter[patient_no] += 1
                 label = options[re.sub(r'\W+', '', row[39])] if len(row) > 39 else 0
-                obs = Observation(patient_no, label, patientCounter[patient_no], day, p, n, g)
+                obs = Observation(patient_no, label, int(row[5]), day, p, n, g)
                 patientMap[patient_no].add_observation(obs)
 
             ## Add data points and labels,
@@ -113,28 +133,30 @@ def load_data_d(filenames, e_pids=None):
 
 
             num_observations = 0
-            for patient in patients:
-                cpatient = patientMap[patient]
-                for featuremap, label, pid in patientMap[patient].getFeatureMaps(is_e=is_e):
+            for patient in patientMap.values():
+                for featuremap, label, pid in patient.getFeatureMaps(is_e=is_e):
                     num_observations += 1
 
-            mtx, labels = np.zeros((num_observations, NUM_PREDICTORS)), np.zeros((num_observations, 1))
+            mtx = np.zeros((num_observations, NUM_PREDICTORS))
+            labels = np.zeros((num_observations, 2))
+            pids = np.zeros((num_observations,1))
+
             counter = 0
 
-            for patient in patients:
-                cpatient = patientMap[patient]
-                for featuremap, label, pid in patientMap[patient].getFeatureMaps(is_e=is_e):
+            for patient in patientMap.values():
+                for featuremap, label, pid in patient.getFeatureMaps(is_e=is_e):
                     mtx[counter, :] = featuremap
                     labels[counter, :] = label
-                    pidmap[pid].append(counter)
+                    pids[counter] = pid
                     counter += 1
             data.append(mtx)
             all_labels.append(labels)
+            all_pids.append(pids)
 
-    combined_data, combined_labels = np.vstack(tuple(data)), np.vstack(tuple(all_labels))
+    combined_data, combined_labels, combined_pids = np.vstack(tuple(data)), np.vstack(tuple(all_labels)),  np.vstack(tuple(all_pids))
     combined_data = sparse.csr_matrix(combined_data)
-    print(combined_data.shape, is_e)
-    return combined_data, combined_labels[:, 0], pidmap
+    # print(combined_data.shape, is_e)
+    return combined_data, combined_labels[:, 0], combined_pids
 
 def computePNG(row):
     p, n, g = 0, 0, 0
@@ -142,21 +164,3 @@ def computePNG(row):
     for i in range(15, 22): n += float(row[i])
     for i in range(22, 38): g += float(row[i])
     return p, n, g
-
-
-"""
-input: (nxd) matrix of training data, (n,1) matrix of labels
-returns: training, validation, testing set
-"""
-def train_val_test(dataset, train=.9, val=.1, test=.0):
-    data, labels, _ = dataset
-    n, d = data.shape
-    p = np.random.permutation(n)
-    data, labels = data[p], labels[p]
-
-    num_train, num_val, num_test = int(n * train), int(n * val), int(n * test)
-
-    train = (data[0:num_train, :], labels[0:num_train], 1)
-    val = (data[num_train:num_train+num_val, :], labels[num_train:num_train+num_val], 1)
-    test = (data[num_train+num_val:, :], labels[num_train+num_val:], 1)
-    return train, val, test
