@@ -89,8 +89,8 @@ def part_d():
 
 
 def __main__():
-    part_c()
-    # part_d()
+    # part_c()
+    part_d()
 
 
 __main__()

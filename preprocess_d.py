@@ -19,7 +19,7 @@ in the dataset.
 ##  - Num previous observations
 ##  - TxGroup
 
-NUM_PREDICTORS = 25
+NUM_PREDICTORS = 20
 countries = {
     '"USA"':1,
     '"UK"':2,
@@ -50,18 +50,24 @@ class DPatient:
 
     def res(self, cur, first, second, third, fourth, fifth):
         num_diff =  len(self.observations) - 1
+        num_days = abs(self.observations[-1].day - self.observations[0].day)
         if num_diff > 0:
             avg_p_diff = sum(
                 [self.observations[idx+1].p - self.observations[idx].p for idx, _ in enumerate(self.observations) if idx < num_diff]
-            )
+            ) / num_diff
             avg_n_diff = sum(
                 [self.observations[idx+1].n - self.observations[idx].n for idx, _ in enumerate(self.observations) if idx < num_diff]
-            )
+            ) / num_diff
             avg_g_diff = sum(
                 [self.observations[idx+1].g - self.observations[idx].g for idx, _ in enumerate(self.observations) if idx < num_diff]
-            )
+            ) / num_diff
         else:
             avg_p_diff, avg_n_diff, avg_g_diff = 0, 0, 0
+
+        p_change_per_day = abs(self.observations[-1].p - self.observations[0].p) / (num_days+1)
+        n_change_per_day = abs(self.observations[-1].n - self.observations[0].n) / (num_days+1)
+        g_change_per_day = abs(self.observations[-1].g - self.observations[0].g) / (num_days+1)
+
         # print(*[1 if self.ctr == idx else 0 for idx in range(len(countryMap.values()))])
 
         ctrys = [0, 0, 0, 0]
@@ -70,7 +76,7 @@ class DPatient:
             self.tx,
             cur.day,
             avg_p_diff, avg_n_diff, avg_g_diff,
-            *[1 if self.study == study else 0 for study in studies],
+            # p_change_per_day, n_change_per_day, g_change_per_day,
             *ctrys,
             fifth.day, fourth.day, third.day, second.day, first.day,
             cur.p + cur.n +cur.g,
