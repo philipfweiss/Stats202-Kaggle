@@ -1,0 +1,105 @@
+---
+title: "Final_Project_1"
+author: "Dane Hankamer"
+date: "7/29/2019"
+output: pdf_document
+---
+
+Read in CSV files and combine the data (use all 5 studies!)
+```{r}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(data.table)
+library(sm)
+A = read.csv("Study_A.csv", stringsAsFactors=TRUE)
+B = read.csv("Study_B.csv", stringsAsFactors=TRUE)
+C = read.csv("Study_C.csv", stringsAsFactors=TRUE)
+D = read.csv("Study_D.csv", stringsAsFactors=TRUE)
+E = read.csv("Study_E.csv", stringsAsFactors=TRUE)
+total_data = rbind(A, B, C, D)
+# total_data = rbind(total_data[, names(E)], E)
+# str(total_data)
+# summary(total_data)
+# cor(total_data[sapply(total_data, is.numeric)])
+```
+
+Separate dataframes based on control versus treatment patients
+```{r}
+c_data = filter(total_data, total_data$TxGroup == "Control")
+t_data = filter(total_data, total_data$TxGroup == "Treatment")
+c_data = data.frame(c_data$PatientID, c_data$VisitDay, c_data$PANSS_Total)
+t_data = data.frame(t_data$PatientID, t_data$VisitDay, t_data$PANSS_Total)
+```
+
+Check average PANSS scores for control and treatment data
+```{r}
+c_pans_avg = summarize(c_data, mean(c_data$PANSS_Total))
+t_pans_avg = summarize(t_data, mean(t_data$PANSS_Total))
+# c_pans
+# t_pans
+```
+
+1) Group by unique patient ID for the control dataframe (already done)
+2) Get differences in PANSS scores per each new visit
+3) Calculate average PANSS score change per visit for each patient by taking sum of differences over PatientID counts, where our average includes a difference of 0 for the first visit (some patients only showed up once so don't want to do Sum(Diff)/(Count-1) to get true average PANSS score change and divide by 0)
+```{r}
+panss_diff = ave(c_data$c_data.PANSS_Total, c_data$c_data.PatientID, FUN=function(x) c(0, diff(x)))
+c_data["c_data.panss_diff"] = panss_diff
+c_data = c_data[,c(1,4)]
+```
+```{r}
+control_panss_avgs = aggregate(c_data$c_data.panss_diff~c_data$c_data.PatientID, c_data, mean)
+# control_panss_avgs
+```
+
+Repeat for treatment group, plot overlapping histograms
+```{r}
+panss_diff_t = ave(t_data$t_data.PANSS_Total, t_data$t_data.PatientID, FUN=function(x) c(0, diff(x)))
+t_data["t_data.panss_diff"] = panss_diff_t
+t_data = t_data[,c(1,4)]
+```
+```{r}
+treatment_panss_avgs = aggregate(t_data$t_data.panss_diff~t_data$t_data.PatientID, t_data, mean)
+hist(control_panss_avgs$`c_data$c_data.panss_diff`,
+     main="Histogram for Avg. Change in PANSS Score",
+     xlim=c(-30,30),
+     ylim=c(0,600),
+     breaks=25, 
+     col=rgb(0,0,1,0.8),
+     xlab="Avg. PANSS Score Change / Visit / PatientID")
+hist(treatment_panss_avgs$`t_data$t_data.panss_diff`,
+     col=rgb(1,0,0,0.8),
+     add=T)
+legend("topright", c("Control", "Treatment"), fill=c(rgb(0,0,1,0.8), rgb(1,0,0,0.8)))
+box()
+```
+
+```{r}
+control_density = data.frame(x=control_panss_avgs$`c_data$c_data.panss_diff`, vec="Control")
+treatment_density = data.frame(x=treatment_panss_avgs$`t_data$t_data.panss_diff`, vec="Treatment")
+df = rbind(control_density, treatment_density)
+
+gg = ggplot(data=df, aes(x=x,fill=vec)) + geom_density(alpha=0.2)
+gg + labs(title="Density Plot for Average Change in PANSS Score", x="Avg. PANSS Score Change")
+```
+
+```{r}
+cat("Mean score change for control patients/visit: ", mean(control_panss_avgs$`c_data$c_data.panss_diff`), "\n")
+cat("PANSS score std dev for control patients/visit: ", sd(control_panss_avgs$`c_data$c_data.panss_diff`), "\n")
+cat("Mean score change for treatment patients/visit: ", mean(treatment_panss_avgs$`t_data$t_data.panss_diff`), "\n")
+cat("PANSS score std dev for treatment patients/visit: ", sd(treatment_panss_avgs$`t_data$t_data.panss_diff`), "\n")
+```
+
+Run variance test (Fisher's F-test) to see if the data passes the homoscedasticity test (see if variances are homogenous)
+```{r}
+control = control_panss_avgs$`c_data$c_data.panss_diff`
+treatment = treatment_panss_avgs$`t_data$t_data.panss_diff`
+var.test(control, treatment)
+```
+
+Fisher's F-test yields a p-value > 0.05, so we will assume that the samples (control versus treatment) are homogenous. Now we run a two-sample t-test with var.equal=TRUE to see if the treatment has an effect on schizophrenia.
+```{r}
+treatment_effect_test = t.test(control, treatment, var.equal=TRUE)
+treatment_effect_test
+```

@@ -1,0 +1,48 @@
+---
+title: "Final_Project_4.Rmd"
+author: "Dane Hankamer"
+date: "8/7/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+Conclusions: We see extreme differences in the percent of scores flagged/assigned to CS based on the test country. We will use this to our advantage in Problem 4. There does not seem to be a significant difference between the averages for Total_PANSS_Score between those tests that were flagged/assigned to CS and those that passed. Also, there are vast differences between the percent of flagged/assigned to CS tests based on the study (A,B,C,D).
+```{r}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(data.table)
+library(sm)
+A = read.csv("Study_A.csv", stringsAsFactors=TRUE)
+B = read.csv("Study_B.csv", stringsAsFactors=TRUE)
+C = read.csv("Study_C.csv", stringsAsFactors=TRUE)
+D = read.csv("Study_D.csv", stringsAsFactors=TRUE)
+E = read.csv("Study_E.csv", stringsAsFactors=TRUE)
+total_data = rbind(A, B, C, D)
+flagged_data = subset(total_data, total_data$LeadStatus!="Passed")
+passed_data = subset(total_data, total_data$LeadStatus=="Passed")
+# summary(flagged_data)
+```
+
+```{r}
+# summary(passed_data)
+```
+
+```{r}
+options(max.print=100000)
+n_passed_data = round(total_data[sapply(total_data, is.numeric)], 2)
+n_flagged_data = round(total_data[sapply(total_data, is.numeric)], 2)
+passed_mat = as.matrix(n_passed_data)
+flagged_mat = as.matrix(n_flagged_data)
+# cor(passed_mat, flagged_mat)
+```
+
+```{r}
+# summary(E)
+```
+
+```{r}
+table(total_data$Country)
+count(total_data)
+```

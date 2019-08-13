@@ -1,0 +1,202 @@
+---
+title: "Final_Project_2"
+author: "Dane Hankamer"
+date: "7/30/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+General approach:
+1) Combine data
+2) Reduce data frame to include only day 0 evaluations (3000 rows)
+3) Check for correlations between variables
+4) Data transformations (total positive score, total negative score, interaction term for positive * negative score, comparison to median PANSS score / median positive * negative score)
+5) PCA to reduce dimensionality and determine variables that best explain the dataset... just exploration
+6) K-means clustering with "most important variables"
+7) K-means clustering with all variables
+8) Analysis of cluster results
+
+
+Combine data to get all schizophrenia patients and reduce dataset to only day 0 evaluation
+```{r}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(data.table)
+library(sm)
+library(Hmisc)
+library(tidyverse)
+library(cluster)
+library(factoextra)
+library(FactoMineR)
+A = read.csv("Study_A.csv", stringsAsFactors=FALSE)
+B = read.csv("Study_B.csv", stringsAsFactors=FALSE)
+C = read.csv("Study_C.csv", stringsAsFactors=FALSE)
+D = read.csv("Study_D.csv", stringsAsFactors=FALSE)
+E = read.csv("Study_E.csv", stringsAsFactors=FALSE)
+total_data = rbind(A, B, C, D)
+total_data = rbind(total_data[, names(E)], E)
+total_data = subset(total_data, total_data$VisitDay==0)
+```
+
+Summarize data and check for correlations between variables
+```{r}
+summ = summary(total_data)
+numeric_total_data = round(total_data[sapply(total_data, is.numeric)], 2)
+corr_res = rcorr(as.matrix(numeric_total_data))
+pvals = corr_res$P
+corr_mat = corr_res$r
+# corr_mat
+# scatters = pairs(total_data[sapply(total_data, is.numeric)])
+```
+
+Data transformations before splitting
+```{r}
+# Total positive syndrome score
+total_data$p_total = total_data$P1 + total_data$P2 + total_data$P3 + total_data$P4 + total_data$P5 + total_data$P6 + total_data$P7
+p_median = median(total_data$p_total)
+
+# Total negative syndrom score
+total_data$n_total = total_data$N1 + total_data$N2 + total_data$N3 + total_data$N4 + total_data$N5 + total_data$N6 + total_data$N7
+n_median = median(total_data$n_total)
+
+# Total negative score * total positive score value (possible case of bipolar disorder)
+total_data$pos_and_neg = total_data$p_total * total_data$n_total
+pn_median = median(total_data$pos_and_neg)
+```
+
+If you run this section (hand clustering), you must rerun sections before to perform PCA and kmeans
+```{r}
+# Comparison of total PANSS score to the median PANSS score
+# panss_median = median(total_data$PANSS_Total)
+# total_data$panss_median_comp = total_data$PANSS_Total > panss_median
+
+# Comparison of positive * negative score to the median positive * negative score
+# total_data$pos_and_neg_comp = total_data$pos_and_neg > pn_median
+
+# split(total_data, list(total_data$panss_median_comp, total_data$pos_and_neg_comp))
+```
+
+Check for correlations between variables again (only for hand clustering)
+```{r}
+# numeric_total_data = round(total_data[sapply(total_data, is.numeric)], 2)
+# corr_res = rcorr(as.matrix(numeric_total_data))
+# pvals = corr_res$P
+# corr_mat = corr_res$r
+# corr_mat
+```
+
+Try PCA to understand which variables best explain the dataset / reduce dimensionality (run before kmeans code!)
+```{r}
+set.seed(1)
+total_data = total_data[,c(3,4,5,6,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42)]
+total_data = scale(total_data)
+# total_data
+```
+```{r}
+res.pca = PCA(total_data, graph=FALSE)
+fviz_screeplot(res.pca, ncp=10)
+fviz_pca_contrib(res.pca, choice = "var", axes = 1:2)
+
+# Alternative PCA code
+# pca = prcomp(cluster_total_data, scale.=F, center=F)
+# pca$rotation
+# pca$x
+# total_data
+# panss_sauce = abs(total_data[,35])
+# plot(pca$x[,1:2], col=panss_sauce)
+```
+
+Use k-means clustering with top 3 variables
+```{r}
+set.seed(4)
+cluster_total_data = total_data[,35:37]
+
+within_ss = function(k) {
+  kmeans(cluster_total_data, k, nstart=25)$tot.withinss
+}
+k_values = 1:12
+within_ss_values = map_dbl(k_values, within_ss)
+
+plot(k_values, within_ss_values, type="b", pch=19, frame=FALSE, xlab="Number of Clusters K", ylab="Total Within-Clusters SS Error")
+title("K-Means with top 3 variables from PCA1/2")
+
+# Code below for testing kmeans method and finding elbow
+# n_clusters = fviz_nbclust(cluster_total_data, kmeans, method="wss")
+# n_clusters = n_clusters$data
+# max_cluster = as.numeric(n_clusters$clusters[which.max(n_clusters$y)])
+# max_cluster
+```
+
+Using 4 cluster solution at elbow of graph above, perform K-means cluster analysis
+```{r}
+set.seed(4)
+cluster_fit = kmeans(cluster_total_data, 4)
+
+# Obtain cluster means
+aggregate(cluster_total_data, by=list(cluster_fit$cluster), FUN=mean)
+
+# Append cluster assignments to data frame
+final_data = data.frame(cluster_total_data, cluster_fit$cluster)
+
+# Obtain cluster counts
+as.data.frame(table(final_data$cluster_fit.cluster))
+```
+
+Note on PCA: Retaining components with highest variance does not necessarily lead to clearly visible clusters. This misleading claim can be seen when clusters are separated well in dimensions where they are not most spread out as the total cloud of dimensions. However, PCA will likely reveal clustering once PCA analysis is performed.
+
+Use k-means clustering with all transformation variables
+```{r}
+set.seed(4)
+
+within_ss = function(k) {
+  kmeans(total_data, k, nstart=25)$tot.withinss
+}
+k_values = 1:12
+within_ss_values = map_dbl(k_values, within_ss)
+
+plot(k_values, within_ss_values, type="b", pch=19, frame=FALSE, xlab="Number of Clusters K", ylab="Total Within-Clusters SS Error")
+title("K-Means with all variables")
+
+# Code below for testing kmeans method and finding elbow
+# n_clusters = fviz_nbclust(cluster_total_data, kmeans, method="wss")
+# n_clusters = n_clusters$data
+# max_cluster = as.numeric(n_clusters$clusters[which.max(n_clusters$y)])
+# max_cluster
+```
+
+Using 4 cluster solution at elbow of graph above, perform K-means cluster analysis
+```{r}
+set.seed(4)
+cluster_fit = kmeans(total_data, 4)
+
+# Obtain cluster means
+aggregate(total_data, by=list(cluster_fit$cluster), FUN=mean)
+
+# Append cluster assignments to data frame
+final_data = data.frame(total_data, cluster_fit$cluster)
+
+# Obtain cluster counts
+as.data.frame(table(final_data$cluster_fit.cluster))
+```
+
+Use k-means clustering with top 4 variables (slightly worse than top 3 variables in my opinion)
+```{r}
+set.seed(4)
+cluster_total_data = total_data[,35:38]
+
+within_ss = function(k) {
+  kmeans(cluster_total_data, k, nstart=25)$tot.withinss
+}
+k_values = 1:12
+within_ss_values = map_dbl(k_values, within_ss)
+
+plot(k_values, within_ss_values, type="b", pch=19, frame=FALSE, xlab="Number of Clusters K", ylab="Total Within-Clusters SS Error")
+
+# Code below for testing kmeans method and finding elbow
+# n_clusters = fviz_nbclust(cluster_total_data, kmeans, method="wss")
+# n_clusters = n_clusters$data
+# max_cluster = as.numeric(n_clusters$clusters[which.max(n_clusters$y)])
+# max_cluster
+```
+
